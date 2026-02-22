@@ -5,23 +5,21 @@ import { ok, err } from "@/lib/response";
 
 type Params = { params: Promise<{ runId: string }> };
 
-export async function GET(req: NextRequest, { params }: Params) {
+export async function POST(req: NextRequest, { params }: Params) {
   try {
     const admin = await getAdminFromRequest(req);
     if (!admin) return err("UNAUTHORIZED", "Admin session required.", 401);
 
     const { runId } = await params;
-    const run = await prisma.run.findUnique({
+    await prisma.run.update({
       where: { id: runId },
-      include: {
-        player: { select: { id: true, name: true, age: true, preferredLanguage: true } },
-        events: { orderBy: { timestamp: "asc" } },
-      },
+      data: { status: "invalid" },
     });
-    if (!run) return err("NOT_FOUND", "Run not found.", 404);
-    return ok(run);
-  } catch (e) {
-    console.error("[GET /api/admin/runs/[runId]]", e);
+
+    return ok({ invalidated: true });
+  } catch (e: any) {
+    if (e?.code === "P2025") return err("NOT_FOUND", "Run not found.", 404);
+    console.error("[POST /api/admin/runs/[runId]/invalidate]", e);
     return err("INTERNAL", "Unexpected error.", 500);
   }
 }

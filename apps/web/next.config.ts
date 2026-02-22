@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  transpilePackages: ["@qclue/qr", "@qclue/ai", "@qclue/db"],
 };
 
 export default nextConfig;

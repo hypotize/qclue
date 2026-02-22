@@ -1,6 +1,15 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { ADMIN_COOKIE } from "@/lib/auth";
+import { ok } from "@/lib/response";
 
-// TODO: implement
-export async function POST(req: NextRequest) {
-  return NextResponse.json({ data: null, error: { code: "NOT_IMPLEMENTED", message: "TODO" } }, { status: 501 });
+export async function POST() {
+  const response = ok({ loggedOut: true }) as NextResponse;
+  response.cookies.set(ADMIN_COOKIE, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+  return response;
 }

@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { RunStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAdminFromRequest } from "@/lib/auth";
 import { ok, err } from "@/lib/response";
@@ -9,41 +10,38 @@ export async function GET(req: NextRequest) {
     if (!admin) return err("UNAUTHORIZED", "Admin session required.", 401);
 
     const { searchParams } = req.nextUrl;
+    const huntId = searchParams.get("huntId") ?? undefined;
+    const status = searchParams.get("status") as RunStatus | null;
     const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
     const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") ?? "50", 10)));
 
-    const [total, players] = await prisma.$transaction([
-      prisma.player.count(),
-      prisma.player.findMany({
-        orderBy: { createdAt: "desc" },
+    const where: any = {
+      ...(huntId ? { huntId } : {}),
+      ...(status ? { status } : {}),
+    };
+
+    const [total, runs] = await prisma.$transaction([
+      prisma.run.count({ where }),
+      prisma.run.findMany({
+        where,
+        orderBy: { startedAt: "desc" },
         skip: (page - 1) * pageSize,
         take: pageSize,
-        include: {
-          runs: {
-            orderBy: { startedAt: "desc" },
-            take: 1,
-            select: { id: true, status: true, currentClueIndex: true, huntId: true },
-          },
-        },
+        include: { player: { select: { id: true, name: true } } },
       }),
     ]);
 
     return ok({
-      players: players.map((p) => ({
-        id: p.id,
-        name: p.name,
-        age: p.age,
-        preferredLanguage: p.preferredLanguage,
-        assignedLevel: p.assignedLevel,
-        createdAt: p.createdAt.toISOString(),
-        latestRun: p.runs[0] ?? null,
+      runs: runs.map((r) => ({
+        ...r,
+        totalTimeMs: r.totalTimeMs !== null ? Number(r.totalTimeMs) : null,
       })),
       total,
       page,
       pageSize,
     });
   } catch (e) {
-    console.error("[GET /api/admin/players]", e);
+    console.error("[GET /api/admin/runs]", e);
     return err("INTERNAL", "Unexpected error.", 500);
   }
 }
