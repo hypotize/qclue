@@ -1,0 +1,207 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum DifficultyLevel {
+  basic
+  elementary
+  senior_elementary
+  junior_high
+  senior_high
+  adult
+}
+
+enum LanguageCode {
+  en
+  ja
+  fr
+  es
+  zh_Hans
+  zh_Hant
+}
+
+enum RunStatus {
+  active
+  finished
+  abandoned
+  invalid
+}
+
+enum RunEventType {
+  clue_viewed
+  hint1_shown
+  hint2_shown
+  qr_scanned_ok
+  qr_scanned_wrong
+  qr_unrecognized
+  level_override
+  finished
+}
+
+enum AdminRole {
+  admin
+}
+
+model Admin {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String?   @map("password_hash")
+  role         AdminRole @default(admin)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  clueContents      ClueContent[]
+  levelMappings     LevelAgeMapping[]
+  credentialsCreated AdminCredential[] @relation("created_by")
+  credentialsRotated AdminCredential[] @relation("rotated_by")
+
+  @@map("admins")
+}
+
+model Player {
+  id                String          @id @default(uuid())
+  name              String
+  age               Int
+  preferredLanguage LanguageCode    @map("preferred_language")
+  assignedLevel     DifficultyLevel @map("assigned_level")
+  sessionTokenHash  String          @map("session_token_hash")
+  createdAt         DateTime        @default(now()) @map("created_at")
+
+  runs Run[]
+
+  @@index([sessionTokenHash])
+  @@map("players")
+}
+
+model Hunt {
+  id                      String       @id @default(uuid())
+  name                    String
+  description             String?
+  isActive                Boolean      @default(false) @map("is_active")
+  timezone                String       @default("UTC")
+  finalTreasureYoutubeId  String       @map("final_treasure_youtube_id")
+  fallbackLanguage        LanguageCode @default(en) @map("fallback_language")
+  createdAt               DateTime     @default(now()) @map("created_at")
+  updatedAt               DateTime     @updatedAt @map("updated_at")
+
+  clues Clue[]
+  runs  Run[]
+
+  @@map("hunts")
+}
+
+model LevelAgeMapping {
+  id        String          @id @default(uuid())
+  level     DifficultyLevel @unique
+  minAge    Int             @map("min_age")
+  maxAge    Int?            @map("max_age")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+  updatedBy String?         @map("updated_by")
+
+  admin Admin? @relation(fields: [updatedBy], references: [id])
+
+  @@map("level_age_mappings")
+}
+
+model Clue {
+  id            String   @id @default(uuid())
+  huntId        String   @map("hunt_id")
+  sequenceIndex Int      @map("sequence_index")
+  token         String   @unique
+  isFinal       Boolean  @default(false) @map("is_final")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  hunt     Hunt          @relation(fields: [huntId], references: [id], onDelete: Cascade)
+  contents ClueContent[]
+  events   RunEvent[]
+
+  @@unique([huntId, sequenceIndex])
+  @@index([huntId, sequenceIndex])
+  @@index([token])
+  @@map("clues")
+}
+
+model ClueContent {
+  id         String           @id @default(uuid())
+  clueId     String           @map("clue_id")
+  language   LanguageCode
+  level      DifficultyLevel?
+  clueText   String           @map("clue_text")
+  hint1Text  String?          @map("hint1_text")
+  hint2Text  String?          @map("hint2_text")
+  imageUrl   String?          @map("image_url")
+  approved   Boolean          @default(true)
+  createdBy  String?          @map("created_by")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+
+  clue  Clue   @relation(fields: [clueId], references: [id], onDelete: Cascade)
+  admin Admin? @relation(fields: [createdBy], references: [id])
+
+  @@unique([clueId, language, level])
+  @@index([clueId, language, level])
+  @@map("clue_contents")
+}
+
+model Run {
+  id                String          @id @default(uuid())
+  playerId          String          @map("player_id")
+  huntId            String          @map("hunt_id")
+  startedAt         DateTime        @default(now()) @map("started_at")
+  finishedAt        DateTime?       @map("finished_at")
+  status            RunStatus       @default(active)
+  totalTimeMs       BigInt?         @map("total_time_ms")
+  currentClueIndex  Int             @default(1) @map("current_clue_index")
+  lastProgressedAt  DateTime        @default(now()) @map("last_progressed_at")
+  hintsUsedCount    Int             @default(0) @map("hints_used_count")
+  levelOverridden   Boolean         @default(false) @map("level_overridden")
+  levelAtStart      DifficultyLevel @map("level_at_start")
+  levelAtFinish     DifficultyLevel? @map("level_at_finish")
+  createdAt         DateTime        @default(now()) @map("created_at")
+
+  player Player     @relation(fields: [playerId], references: [id])
+  hunt   Hunt       @relation(fields: [huntId], references: [id])
+  events RunEvent[]
+
+  @@index([playerId])
+  @@index([huntId, status, totalTimeMs])
+  @@index([status, lastProgressedAt])
+  @@map("runs")
+}
+
+model RunEvent {
+  id        String       @id @default(uuid())
+  runId     String       @map("run_id")
+  eventType RunEventType @map("event_type")
+  clueId    String?      @map("clue_id")
+  timestamp DateTime     @default(now())
+  metadata  Json?
+
+  run  Run   @relation(fields: [runId], references: [id], onDelete: Cascade)
+  clue Clue? @relation(fields: [clueId], references: [id])
+
+  @@index([runId, eventType, timestamp])
+  @@index([runId, clueId, eventType])
+  @@map("run_events")
+}
+
+model AdminCredential {
+  id             String    @id @default(uuid())
+  credentialHash String    @map("credential_hash")
+  isActive       Boolean   @default(true) @map("is_active")
+  scope          String    @default("global")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  createdById    String?   @map("created_by")
+  rotatedAt      DateTime? @map("rotated_at")
+  rotatedById    String?   @map("rotated_by")
+
+  createdBy Admin? @relation("created_by", fields: [createdById], references: [id])
+  rotatedBy Admin? @relation("rotated_by", fields: [rotatedById], references: [id])
+
+  @@map("admin_credentials")
+}

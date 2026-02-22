@@ -1,0 +1,60 @@
+{
+  "register": {
+    "title": "QClue",
+    "subtitle": "Find the hidden treasures",
+    "namePlaceholder": "Your name",
+    "agePlaceholder": "Your age",
+    "languageLabel": "Language",
+    "submit": "Start"
+  },
+  "confirm": {
+    "title": "Welcome, {name}!",
+    "level": "Your level",
+    "levelLocked": "Your difficulty level is set and cannot be changed.",
+    "start": "Start Hunt"
+  },
+  "clue": {
+    "progress": "Clue {current} of {total}",
+    "scan": "Scan QR Code",
+    "hint1": "Show Hint 1",
+    "hint2": "Show Hint 2",
+    "hintUnlocksIn": "Unlocks in {time}",
+    "overrideRequest": "Request Level Override"
+  },
+  "scan": {
+    "instruction": "Point at the QR code",
+    "cancel": "Cancel"
+  },
+  "scanResult": {
+    "wrongStep": "Not the right treasure for your current step. Keep looking!",
+    "wrongHunt": "This treasure belongs to another hunt.",
+    "alreadyUsed": "You've already found this one — keep going!",
+    "unrecognized": "That QR wasn't recognized. Try scanning again.",
+    "tryAgain": "Try Again"
+  },
+  "complete": {
+    "title": "You did it!",
+    "time": "Your time",
+    "hintsUsed": "Hints used",
+    "claimPrize": "Claim Your Prize",
+    "viewLeaderboard": "View Leaderboard"
+  },
+  "treasure": {
+    "message": "Congratulations. You've reached the final treasure. Please see the clue master for your prize."
+  },
+  "leaderboards": {
+    "title": "Leaderboards",
+    "today": "Today",
+    "month": "This Month",
+    "allTime": "All Time",
+    "rank": "Rank",
+    "name": "Name",
+    "level": "Level",
+    "time": "Time",
+    "hints": "Hints"
+  },
+  "errors": {
+    "noActiveHunt": "No hunt is running right now. Check back soon!",
+    "connection": "Connection error — please try again."
+  }
+}
