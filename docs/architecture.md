@@ -7,7 +7,7 @@ QClue consists of three frontend surfaces backed by a single API server and data
 ```
 ┌──────────────────────────┐     ┌──────────────────────────┐
 │   Player Mobile App      │     │   Admin Desktop Console  │
-│  (PWA or React Native)   │     │   (Responsive Web App)   │
+│        (PWA)             │     │   (Responsive Web App)   │
 └────────────┬─────────────┘     └────────────┬─────────────┘
              │                                │
              ▼                                ▼
@@ -22,48 +22,38 @@ QClue consists of three frontend surfaces backed by a single API server and data
      │  (primary DB) │    │  (cache/rate)  │
      └───────────────┘    └────────────────┘
                  │
-     ┌───────────▼───────────┐
-     │   LLM API (AI Assist) │
-     └───────────────────────┘
+     ┌───────────────────────────────────┐
+     │  OpenRouter API → Claude (AI)    │
+     └───────────────────────────────────┘
 ```
 
 ---
 
-## 2. Open Architecture Decisions
+## 2. Architecture Decisions (Resolved)
 
-> These decisions must be resolved before implementation begins.
+### 2.1 Player App: **PWA**
 
-### 2.1 Player App: PWA vs. React Native
+Single Next.js codebase shared with the admin console. QR scanning via `@zxing/browser` (browser `getUserMedia` API). No app store required; instant deploy. If camera reliability proves insufficient on a target device, revisit with a native wrapper.
 
-> **DECISION REQUIRED**
+### 2.2 API Style: **REST**
 
-| Option | Pros | Cons |
-|---|---|---|
-| **PWA** (mobile web) | Single codebase with admin console; no app store; instant deploy | Camera/QR API limited to browser `getUserMedia`; less native feel |
-| **React Native** | Native camera access; offline capability possible; native UX | Separate codebase; app store required; longer build cycle |
+REST endpoints as defined in `api.md`. GraphQL is not in scope for v1.
 
-**Recommendation:** PWA using Next.js (same stack as admin), leveraging `@zxing/library` or similar for browser-based QR scanning. Revisit if camera reliability proves insufficient.
+### 2.3 QR Token Format: **Compact Base64URL JSON (Option B)**
 
-### 2.2 API Style: REST vs. GraphQL
+```
+base64url({ "h": "<huntId>", "c": "<clueId>", "s": "<hmac>" })
+```
 
-> **DECISION REQUIRED** (this document proceeds with REST as the default based on the spec's example endpoints)
+Chosen for lower QR data density, ensuring reliable scanning at 2 cm × 2 cm. See `security.md` for full token spec.
 
-If GraphQL is chosen, the endpoint list in `api.md` must be redesigned as a schema + resolver map.
+### 2.4 LLM Provider: **Claude via OpenRouter**
 
-### 2.3 QR Token Format
-
-> **DECISION REQUIRED** — see `security.md` for full analysis.
-
-The chosen format affects QR data density (and thus scanability at 2 cm × 2 cm), mobile parsing logic, and backend validation.
-
-### 2.4 LLM Provider for AI Assist
-
-> **DECISION REQUIRED**
-
-Candidates: Anthropic Claude API, OpenAI GPT-4o. Selection should consider:
-- API cost per generation
-- Language quality for all 6 supported languages
-- Rate limits and latency acceptable for admin UX
+- Provider: [OpenRouter](https://openrouter.ai)
+- Model: Claude (latest capable model available via OpenRouter; e.g. `anthropic/claude-sonnet-4-5`)
+- Auth: `OPENROUTER_API_KEY` environment variable
+- API: OpenAI-compatible REST endpoint (`https://openrouter.ai/api/v1/chat/completions`)
+- Use: admin-triggered clue variant generation and translation; async job pattern
 
 ---
 
@@ -77,12 +67,13 @@ Candidates: Anthropic Claude API, OpenAI GPT-4o. Selection should consider:
 - QR generation: `qrcode` npm package (server-side, for PDF output)
 - PDF generation: `pdfkit` or `puppeteer` (for print-ready QR sheets)
 
-### 3.2 Player App
+### 3.2 Player App (PWA)
 
-- **If PWA:** Next.js with service worker; QR scanning via `@zxing/browser`
-- **If React Native:** Expo; QR scanning via `expo-camera` + `expo-barcode-scanner`
+- Framework: **Next.js** (shared codebase with admin console; separate routes/layouts)
+- QR scanning: `@zxing/browser`
 - Auth: Device-stored session token issued at registration (see `security.md`)
-- Language: i18n via `next-intl` (PWA) or `i18next` (RN)
+- Language: i18n via `next-intl`
+- Service worker: enabled for add-to-homescreen and basic asset caching
 
 ---
 
@@ -113,12 +104,16 @@ If included, Redis serves the following purposes:
 
 Redis is optional for v1. Implement rate limiting in-process (e.g., `express-rate-limit` in-memory) first; add Redis if horizontal scaling is required.
 
-### 4.4 AI Service Integration
+### 4.4 AI Service Integration (OpenRouter → Claude)
 
-- Admin-triggered only (no player-facing AI calls)
-- Requests are async: admin triggers generation, result is saved as `approved = false` content rows, admin reviews in the console
-- Prompt templates are stored in code (not in DB) for v1; configurable in a future version
-- Failure handling: display error in admin UI, no partial saves; admin retries manually
+- Provider: OpenRouter (`https://openrouter.ai/api/v1/chat/completions`)
+- Model: `anthropic/claude-sonnet-4-5` (or latest Claude model available)
+- Auth: `OPENROUTER_API_KEY` environment variable
+- Admin-triggered only; no player-facing AI calls
+- Requests are async: admin triggers generation → job queued → result saved as `approved = false` ClueContent rows → admin reviews and approves in console
+- Prompt templates stored in code (`packages/ai/prompts/`) for v1
+- Failure handling: surface error in admin UI; no partial saves; admin retries manually
+- OpenRouter headers: include `HTTP-Referer` and `X-Title` as recommended by OpenRouter
 
 ---
 
@@ -158,12 +153,11 @@ All secrets (DB connection string, JWT secret, HMAC signing key, LLM API key) mu
 ```
 qclue/
 ├── apps/
-│   ├── web/          # Next.js app (admin console + player PWA + API routes)
-│   └── native/       # React Native app (if RN chosen; otherwise omit)
+│   └── web/          # Next.js app (admin console + player PWA + API routes)
 ├── packages/
 │   ├── db/           # Prisma schema + migrations
 │   ├── qr/           # QR generation + PDF utilities
-│   └── ai/           # LLM integration + prompt templates
+│   └── ai/           # OpenRouter/Claude integration + prompt templates
 └── docs/
 ```
 

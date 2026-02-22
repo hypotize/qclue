@@ -15,8 +15,12 @@ Players scan physical QR codes placed around a house to progress through clues. 
 | [UX Flows](docs/ux-flows.md) | Screen-by-screen player and admin flows |
 | [Security](docs/security.md) | QR token signing, credential lifecycle, auth, rate limiting |
 
-## Open Decisions (resolve before implementation)
+## Key Decisions
 
-- **Mobile platform:** PWA (recommended) vs. React Native — see [architecture.md](docs/architecture.md#21-player-app-pwa-vs-react-native)
-- **QR token format:** Option B (compact base64url, recommended) vs. Option A (URL scheme) — see [security.md](docs/security.md#1-qr-token-format)
-- **LLM provider** for AI assist — see [architecture.md](docs/architecture.md#24-llm-provider-for-ai-assist)
+| Decision | Choice |
+|---|---|
+| Player app | PWA (Next.js) |
+| QR token format | Compact base64url JSON |
+| AI assist | Claude via OpenRouter API |
+| API style | REST |
+| Database | PostgreSQL + Prisma |

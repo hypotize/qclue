@@ -1,30 +1,17 @@
 # QClue — Security Model (v1.0)
 
-## 1. QR Token Format
+## 1. QR Token Format: Compact Base64URL JSON
 
-> **DECISION REQUIRED:** Choose Option A or Option B before implementation. Analysis below.
-
-### Option A — URL Scheme
-
-```
-qclue://hunt/{huntId}/clue/{clueId}?sig={hmac}
-```
-
-- Human-readable; debuggable with a standard QR scanner app
-- Longer payload → higher QR data density → may reduce reliability at 2 cm × 2 cm
-- Requires a custom URL scheme (or HTTPS URL) for mobile parsing
-
-### Option B — Compact Base64URL JSON
+**Decision:** Compact Base64URL JSON (Option B). Chosen for lower QR data density, ensuring reliable scanning at 2 cm × 2 cm.
 
 ```
 base64url({ "h": "<huntId>", "c": "<clueId>", "s": "<hmac>" })
 ```
 
-- Shorter payload → lower QR density → more reliable at 2 cm × 2 cm (recommended)
-- Opaque to casual inspection (acceptable; QR codes are not user-readable anyway)
+- Shorter payload → lower QR density → reliable at 2 cm × 2 cm
+- Opaque to casual inspection (acceptable; QR codes are not user-readable)
 - Parsed as a JSON blob server-side
-
-**Recommendation:** Option B. At 2 cm × 2 cm with a standard camera, minimizing QR data density is critical for reliable scanning. Use `QR_ERROR_CORRECTION_LEVEL_M` (15% error correction) with Option B.
+- Use `QR_ERROR_CORRECTION_LEVEL_M` (15% error correction)
 
 ### HMAC Signing
 
@@ -88,7 +75,7 @@ An override grant is **single-use per run**:
 
 - Issued once at `POST /api/players` registration
 - Random 32-byte value (`crypto.randomBytes(32)`), base64url-encoded
-- Stored on device (localStorage for PWA; SecureStore for React Native)
+- Stored on device (`localStorage` via the PWA)
 - Server stores `bcrypt.hash(token, 10)` in `players.session_token_hash`
 - Sent on all player requests as `Authorization: Bearer <token>`
 
@@ -163,7 +150,7 @@ Rate limit responses return HTTP 429 with a `Retry-After` header.
 | CORS | Admin console: same-origin only. Player API: restrict to app origin. |
 | Input sanitization | Validate all inputs server-side; use parameterized queries (Prisma handles this) |
 | SQL injection | Prevented by Prisma ORM (parameterized queries) |
-| Secrets in env vars | `QR_SIGNING_KEY`, `DB_URL`, `LLM_API_KEY`, `SESSION_SECRET` — never committed |
+| Secrets in env vars | `QR_SIGNING_KEY`, `DATABASE_URL`, `OPENROUTER_API_KEY`, `SESSION_SECRET` — never committed |
 | Dependency scanning | Run `npm audit` in CI; fail on high-severity vulnerabilities |
 
 ---
